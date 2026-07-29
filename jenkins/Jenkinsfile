@@ -13,19 +13,23 @@ pipeline {
                 zip -r artifacts/pythonapp.zip app.py README.md .gitignore
                 '''
             }
-
-            post {
-                success {
-                    archiveArtifacts artifacts: 'artifacts/*.zip'
-                }
-            }
         }
 
         stage('Test') {
-            steps {
-                sh '''
-                python3 app.py
-                '''
+            parallel {
+
+                stage('Run Application') {
+                    steps {
+                        sh 'python3 app.py'
+                    }
+                }
+
+                stage('Syntax Check') {
+                    steps {
+                        sh 'python3 -m py_compile app.py'
+                    }
+                }
+
             }
         }
 
@@ -33,6 +37,13 @@ pipeline {
             steps {
                 echo 'This is deploy stage'
             }
+        }
+    }
+
+    post {
+        success {
+            archiveArtifacts artifacts: 'artifacts/*.zip'
+            echo 'Artifact archived successfully'
         }
     }
 }
