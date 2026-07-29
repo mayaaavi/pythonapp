@@ -18,15 +18,15 @@ pipeline {
 
             steps {
                 sh '''
-                echo "Building Python application on server1..."
+                echo "Building Python application..."
 
                 mkdir -p artifacts
 
                 echo "Hello World from Python Application" > artifacts/index.html
 
-                zip -r artifacts/pythonapp.zip app.py README.md .gitignore artifacts/index.html
+                zip -r artifacts/pythonapp.zip app.py .gitignore artifacts/index.html
 
-                echo "Build completed. Artifact created:"
+                echo "Build completed"
                 ls -l artifacts
                 '''
 
@@ -46,7 +46,7 @@ pipeline {
                         unstash 'python-build'
 
                         sh '''
-                        echo "Running application test on server1..."
+                        echo "Running application test..."
                         python3 app.py
                         '''
                     }
@@ -61,7 +61,7 @@ pipeline {
                         unstash 'python-build'
 
                         sh '''
-                        echo "Running syntax check on server2..."
+                        echo "Running syntax check..."
                         python3 -m py_compile app.py
                         '''
                     }
@@ -71,9 +71,7 @@ pipeline {
 
         stage('Deploy to DEV Server') {
             when {
-                expression {
-                    params.select_environment == 'dev'
-                }
+                expression { params.select_environment == 'dev' }
                 beforeAgent true
             }
 
@@ -82,21 +80,18 @@ pipeline {
             }
 
             steps {
+
+                unstash 'python-build'
+
                 sh '''
-                echo "Deploying to DEV server1..."
+                echo "Deploying to DEV..."
+
                 sudo mkdir -p /var/www/html
                 sudo rm -rf /var/www/html/*
-                '''
 
-                dir('/var/www/html') {
-                    unstash 'python-build'
-                }
+                sudo cp artifacts/index.html /var/www/html/index.html
+                sudo cp artifacts/pythonapp.zip /var/www/html/pythonapp.zip
 
-                sh '''
-                sudo cp /var/www/html/artifacts/index.html /var/www/html/index.html
-                sudo cp /var/www/html/artifacts/pythonapp.zip /var/www/html/pythonapp.zip
-
-                echo "DEV deployment completed on server1"
                 ls -l /var/www/html
                 '''
             }
@@ -104,22 +99,21 @@ pipeline {
 
         stage('Approval for PROD Deployment') {
             when {
-                expression {
-                    params.select_environment == 'prod'
-                }
+                expression { params.select_environment == 'prod' }
                 beforeAgent true
             }
 
             steps {
-                input message: 'Do you want to deploy this build to PROD?', ok: 'Approve Deployment'
+                input(
+                    message: 'Deploy to Production?',
+                    ok: 'Approve'
+                )
             }
         }
 
         stage('Deploy to PROD Server') {
             when {
-                expression {
-                    params.select_environment == 'prod'
-                }
+                expression { params.select_environment == 'prod' }
                 beforeAgent true
             }
 
@@ -128,21 +122,18 @@ pipeline {
             }
 
             steps {
+
+                unstash 'python-build'
+
                 sh '''
-                echo "Deploying to PROD server2..."
+                echo "Deploying to PROD..."
+
                 sudo mkdir -p /var/www/html
                 sudo rm -rf /var/www/html/*
-                '''
 
-                dir('/var/www/html') {
-                    unstash 'python-build'
-                }
+                sudo cp artifacts/index.html /var/www/html/index.html
+                sudo cp artifacts/pythonapp.zip /var/www/html/pythonapp.zip
 
-                sh '''
-                sudo cp /var/www/html/artifacts/index.html /var/www/html/index.html
-                sudo cp /var/www/html/artifacts/pythonapp.zip /var/www/html/pythonapp.zip
-
-                echo "PROD deployment completed on server2"
                 ls -l /var/www/html
                 '''
             }
@@ -151,15 +142,15 @@ pipeline {
 
     post {
         success {
-            echo "Pipeline completed successfully. Selected environment: ${params.select_environment}"
+            echo "Pipeline completed successfully"
         }
 
         failure {
-            echo "Pipeline failed. Please check Jenkins console logs."
+            echo "Pipeline failed"
         }
 
         aborted {
-            echo "Pipeline was aborted. PROD deployment may not have been approved."
+            echo "Deployment approval was rejected or aborted"
         }
     }
 }
