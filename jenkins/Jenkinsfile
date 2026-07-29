@@ -1,49 +1,89 @@
 pipeline {
-    agent {
-        label 'server1'
+    agent none
+
+    parameters {
+        choice choices: ['prod', 'dev'], name: 'select_environment'
     }
 
     stages {
 
         stage('Build') {
+            agent {
+                label 'server1'
+            }
+
             steps {
                 sh '''
-                echo "Building Python application..."
+                echo "Building Python application on server1..."
                 mkdir -p artifacts
                 zip -r artifacts/pythonapp.zip app.py README.md .gitignore
+                ls -l artifacts
                 '''
+
+                stash name: 'python-app', includes: 'app.py,README.md,.gitignore,artifacts/*.zip'
             }
         }
 
         stage('Test') {
             parallel {
 
-                stage('Run Application') {
+                stage('Run Application on Server1') {
+                    agent {
+                        label 'server1'
+                    }
+
                     steps {
-                        sh 'python3 app.py'
+                        unstash 'python-app'
+
+                        sh '''
+                        echo "Running application test on server1..."
+                        python3 app.py
+                        '''
                     }
                 }
 
-                stage('Syntax Check') {
+                stage('Syntax Check on Server2') {
+                    agent {
+                        label 'server2'
+                    }
+
                     steps {
-                        sh 'python3 -m py_compile app.py'
+                        unstash 'python-app'
+
+                        sh '''
+                        echo "Running syntax check on server2..."
+                        python3 -m py_compile app.py
+                        '''
                     }
                 }
-
             }
         }
 
         stage('Deploy') {
+            agent {
+                label 'server2'
+            }
+
             steps {
-                echo 'This is deploy stage'
+                unstash 'python-app'
+
+                sh '''
+                echo "Deploying application on server2..."
+                ls -l
+                ls -l artifacts
+                echo "Selected environment is: ${select_environment}"
+                '''
             }
         }
     }
 
     post {
         success {
-            archiveArtifacts artifacts: 'artifacts/*.zip'
-            echo 'Artifact archived successfully'
+            echo 'Pipeline completed successfully after Build, Parallel Test, and Deploy'
+        }
+
+        failure {
+            echo 'Pipeline failed. Please check the failed stage logs.'
         }
     }
 }
