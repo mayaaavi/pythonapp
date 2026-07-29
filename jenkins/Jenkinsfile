@@ -1,25 +1,38 @@
-pipeline
-{
-    agent none
-    stages{
-        stage('build')
-        {
+pipeline {
+    agent {
+        label 'server1'
+    }
+
+    stages {
+
+        stage('Build') {
             steps {
-                echo "this is build stage"
+                sh '''
+                echo "Building Python application..."
+                mkdir -p artifacts
+                zip -r artifacts/pythonapp.zip app.py README.md .gitignore
+                '''
             }
-        }
-        stage('test')
-        {
-            steps {
-                echo "this is test stage"
-            }
-        }
-        stage('deploy')
-        {
-            steps {
-                echo "this is deploy stage"
+
+            post {
+                success {
+                    archiveArtifacts artifacts: 'artifacts/*.zip'
+                }
             }
         }
 
+        stage('Test') {
+            steps {
+                sh '''
+                python3 app.py
+                '''
+            }
+        }
+
+        stage('Deploy') {
+            steps {
+                echo 'This is deploy stage'
+            }
+        }
     }
 }
